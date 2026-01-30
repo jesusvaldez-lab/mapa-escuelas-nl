@@ -1,13 +1,8 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="utf-8" />
-  <title>Mapa de Centros Educativos – Nuevo León</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-  <!-- ===================================================
-       1) LIBRERÍAS EXTERNAS
-       =================================================== -->
+  <meta charset="UTF-8" />
+  <title>Mapa de Escuelas NL</title>
 
   <!-- Leaflet -->
   <link
@@ -19,26 +14,21 @@
   <!-- PapaParse -->
   <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
 
-  <!-- ===================================================
-       2) ESTILOS
-       =================================================== -->
   <style>
     html, body {
-      height: 100%;
       margin: 0;
-    }
-
-    body {
-      font-family: Arial, sans-serif;
-    }
-
-    #map {
+      padding: 0;
       height: 100%;
       width: 100%;
     }
 
+    #map {
+      width: 100%;
+      height: 100vh;
+    }
+
     .popup h3 {
-      margin: 0 0 6px 0;
+      margin: 0 0 4px 0;
       font-size: 14px;
     }
 
@@ -55,14 +45,14 @@
 
 <script>
 /* ======================================================
-   3) CONFIGURACIÓN GENERAL
+   1) CSV
    ====================================================== */
 
 const CSV_URL =
   "https://docs.google.com/spreadsheets/d/e/2PACX-1vT8WuSFX6UeAZioZlDRllmPe2FAfkIVHH-nUo1JbxTCMjbv_TfSJtP8R_LhGwiNCzrI0g1WJ0263NF_/pub?gid=1655227795&single=true&output=csv";
 
 /* ======================================================
-   4) MAPA BASE
+   2) MAPA BASE
    ====================================================== */
 
 const map = L.map("map").setView([25.67, -100.31], 8);
@@ -72,7 +62,7 @@ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
 }).addTo(map);
 
 /* ======================================================
-   5) COLORES POR TURNO
+   3) COLORES POR TURNO
    ====================================================== */
 
 const coloresTurno = {
@@ -84,7 +74,7 @@ const coloresTurno = {
 };
 
 /* ======================================================
-   6) FORMA POR NIVEL
+   4) FORMA POR NIVEL
    ====================================================== */
 
 function formaPorNivel(nivel) {
@@ -98,7 +88,7 @@ function formaPorNivel(nivel) {
 }
 
 /* ======================================================
-   7) EVITAR SUPERPOSICIÓN
+   5) EVITAR SUPERPOSICIÓN
    ====================================================== */
 
 const usados = {};
@@ -112,12 +102,12 @@ function ajustarCoordenadas(lat, lng) {
   }
 
   usados[key]++;
-  const offset = usados[key] * 0.00015;
+  const offset = usados[key] * 0.00012;
   return [lat + offset, lng + offset];
 }
 
 /* ======================================================
-   8) ICONOS PERSONALIZADOS
+   6) ICONOS
    ====================================================== */
 
 function crearIcono(color, forma) {
@@ -149,14 +139,14 @@ function crearIcono(color, forma) {
   }
 
   return L.divIcon({
-    html: html,
+    html,
     className: "",
     iconSize: [size, size]
   });
 }
 
 /* ======================================================
-   9) CARGA DEL CSV (ÍNDICES REALES)
+   7) CARGA CSV (ÍNDICES VERIFICADOS)
    ====================================================== */
 
 Papa.parse(CSV_URL, {
@@ -166,7 +156,6 @@ Papa.parse(CSV_URL, {
 
   complete: function (results) {
 
-    // Omitir encabezados
     results.data.slice(1).forEach(row => {
 
       const cct         = row[0];
@@ -178,14 +167,17 @@ Papa.parse(CSV_URL, {
       const colonia     = row[19];
       const cp          = row[21];
 
-      // 👇 ESTOS SON LOS ÍNDICES CORRECTOS
-      const lng = parseFloat(row[34]); // Oeste de Greenwich (grados)
-      const lat = parseFloat(row[35]); // Norte del Ecuador (grados)
+      // ✅ ÍNDICES CORRECTOS (MUY IMPORTANTE)
+      const lng = parseFloat(row[33]); // Oeste de Greenwich (grados)
+      const lat = parseFloat(row[34]); // Norte del Ecuador (grados)
 
       if (Number.isNaN(lat) || Number.isNaN(lng)) return;
 
       const [latA, lngA] = ajustarCoordenadas(lat, lng);
-      const color = coloresTurno[(turnoNombre || "").toUpperCase()] || coloresTurno.OTRO;
+
+      const color =
+        coloresTurno[(turnoNombre || "").toUpperCase()] || coloresTurno.OTRO;
+
       const forma = formaPorNivel(nivel);
       const icono = crearIcono(color, forma);
 

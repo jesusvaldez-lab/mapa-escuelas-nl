@@ -9,18 +9,18 @@
        1) LIBRERÍAS EXTERNAS
        =================================================== -->
 
-  <!-- Leaflet: motor del mapa -->
+  <!-- Leaflet -->
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
   />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <!-- PapaParse: lectura del CSV -->
+  <!-- PapaParse -->
   <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
 
   <!-- ===================================================
-       2) ESTILOS GENERALES
+       2) ESTILOS
        =================================================== -->
   <style>
     html, body {
@@ -32,13 +32,11 @@
       font-family: Arial, sans-serif;
     }
 
-    /* Contenedor del mapa: ocupa toda la pantalla */
     #map {
       height: 100%;
       width: 100%;
     }
 
-    /* Estilos del popup */
     .popup h3 {
       margin: 0 0 6px 0;
       font-size: 14px;
@@ -53,34 +51,28 @@
 
 <body>
 
-<!-- =====================================================
-     3) CONTENEDOR DEL MAPA
-     ===================================================== -->
 <div id="map"></div>
 
 <script>
 /* ======================================================
-   4) CONFIGURACIÓN GENERAL
+   3) CONFIGURACIÓN GENERAL
    ====================================================== */
 
-// URL pública del CSV (Google Sheets publicado)
 const CSV_URL =
   "https://docs.google.com/spreadsheets/d/e/2PACX-1vT8WuSFX6UeAZioZlDRllmPe2FAfkIVHH-nUo1JbxTCMjbv_TfSJtP8R_LhGwiNCzrI0g1WJ0263NF_/pub?gid=1655227795&single=true&output=csv";
 
 /* ======================================================
-   5) INICIALIZACIÓN DEL MAPA BASE
+   4) MAPA BASE
    ====================================================== */
 
-// Crear el mapa centrado en Nuevo León
 const map = L.map("map").setView([25.67, -100.31], 8);
 
-// Capa base de OpenStreetMap
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
   attribution: "© OpenStreetMap"
 }).addTo(map);
 
 /* ======================================================
-   6) COLORES SEGÚN TURNO
+   5) COLORES POR TURNO
    ====================================================== */
 
 const coloresTurno = {
@@ -92,7 +84,7 @@ const coloresTurno = {
 };
 
 /* ======================================================
-   7) FORMA DEL MARCADOR SEGÚN NIVEL EDUCATIVO
+   6) FORMA POR NIVEL
    ====================================================== */
 
 function formaPorNivel(nivel) {
@@ -106,7 +98,7 @@ function formaPorNivel(nivel) {
 }
 
 /* ======================================================
-   8) EVITAR MARCADORES ENCIMADOS
+   7) EVITAR SUPERPOSICIÓN
    ====================================================== */
 
 const usados = {};
@@ -120,12 +112,12 @@ function ajustarCoordenadas(lat, lng) {
   }
 
   usados[key]++;
-  const offset = usados[key] * 0.00015; // ~15 m
+  const offset = usados[key] * 0.00015;
   return [lat + offset, lng + offset];
 }
 
 /* ======================================================
-   9) CREACIÓN DE ICONOS PERSONALIZADOS
+   8) ICONOS PERSONALIZADOS
    ====================================================== */
 
 function crearIcono(color, forma) {
@@ -164,48 +156,39 @@ function crearIcono(color, forma) {
 }
 
 /* ======================================================
-   10) CARGA Y PROCESAMIENTO DEL CSV
+   9) CARGA DEL CSV (ÍNDICES REALES)
    ====================================================== */
 
 Papa.parse(CSV_URL, {
   download: true,
-  header: false,          // NO usamos encabezados
+  header: false,
   skipEmptyLines: true,
 
   complete: function (results) {
 
-    // Omitir la primera fila (encabezados)
+    // Omitir encabezados
     results.data.slice(1).forEach(row => {
 
-      /* ----------------------------------------------
-         Columnas por posición (A = 0)
-         ---------------------------------------------- */
-      const cct           = row[0];   // A
-      const turnoNombre   = row[2];   // C
-      const nombre        = row[3];   // D
-      const nivel         = row[5];   // F
-      const municipio     = row[12];  // M
-      const domicilio     = row[15];  // P
-      const colonia       = row[19];  // T
-      const cp            = row[21];  // V
+      const cct         = row[0];
+      const turnoNombre = row[2];
+      const nombre      = row[3];
+      const nivel       = row[5];
+      const municipio   = row[12];
+      const domicilio   = row[15];
+      const colonia     = row[19];
+      const cp          = row[21];
 
-      const lng = parseFloat(row[24]); // Long_Dec (Y)
-      const lat = parseFloat(row[25]); // Lat_Dec  (Z)
+      // 👇 ESTOS SON LOS ÍNDICES CORRECTOS
+      const lng = parseFloat(row[34]); // Oeste de Greenwich (grados)
+      const lat = parseFloat(row[35]); // Norte del Ecuador (grados)
 
-      // Ignorar filas sin coordenadas válidas
-      if (isNaN(lat) || isNaN(lng)) return;
+      if (Number.isNaN(lat) || Number.isNaN(lng)) return;
 
-      /* ----------------------------------------------
-         Ajuste de posición y estilo
-         ---------------------------------------------- */
       const [latA, lngA] = ajustarCoordenadas(lat, lng);
       const color = coloresTurno[(turnoNombre || "").toUpperCase()] || coloresTurno.OTRO;
       const forma = formaPorNivel(nivel);
       const icono = crearIcono(color, forma);
 
-      /* ----------------------------------------------
-         Contenido del popup
-         ---------------------------------------------- */
       const popup = `
         <div class="popup">
           <h3>${nombre || ""}</h3>
@@ -216,9 +199,6 @@ Papa.parse(CSV_URL, {
         </div>
       `;
 
-      /* ----------------------------------------------
-         Creación del marcador
-         ---------------------------------------------- */
       L.marker([latA, lngA], { icon: icono })
         .addTo(map)
         .bindPopup(popup)

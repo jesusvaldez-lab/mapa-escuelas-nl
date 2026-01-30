@@ -15,8 +15,26 @@
   <style>
     body { margin: 0; font-family: Arial, sans-serif; }
     #map { height: 100vh; width: 100%; }
+
     .popup h3 { margin: 0 0 6px 0; font-size: 14px; }
     .popup p { margin: 2px 0; font-size: 12px; }
+
+    .legend {
+      background: white;
+      padding: 10px;
+      font-size: 12px;
+      line-height: 1.4;
+    }
+    .legend div {
+      margin-bottom: 6px;
+    }
+    .legend span {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
   </style>
 </head>
 <body>
@@ -107,7 +125,12 @@ function crearIcono(color, forma) {
 }
 
 /***********************************************************
- CARGA DEL CSV (POR POSICIÓN DE COLUMNAS)
+ CAPA DE ESCUELAS
+***********************************************************/
+const capaEscuelas = L.layerGroup().addTo(map);
+
+/***********************************************************
+ CARGA CSV
 ***********************************************************/
 Papa.parse(CSV_URL, {
   download: true,
@@ -115,23 +138,20 @@ Papa.parse(CSV_URL, {
   skipEmptyLines: true,
   complete: function (results) {
 
-    // Omitir encabezado
     results.data.slice(1).forEach(row => {
 
-      // Columnas (A = 0)
-      const cct           = row[0];   // A
-      const turnoClave    = row[1];   // B
-      const turnoNombre   = row[2];   // C
-      const nombreEscuela = row[3];   // D
-      const nivel         = row[5];   // F
-      const control       = row[7];   // H
-      const municipio     = row[12];  // M
-      const domicilio     = row[15];  // P
-      const colonia       = row[19];  // T
-      const cp            = row[21];  // V
+      const cct           = row[0];
+      const turnoNombre   = row[2];
+      const nombreEscuela = row[3];
+      const nivel         = row[5];
+      const control       = row[7];
+      const municipio     = row[12];
+      const domicilio     = row[15];
+      const colonia       = row[19];
+      const cp            = row[21];
 
-      const lng = parseFloat(row[24]); // Y
-      const lat = parseFloat(row[25]); // Z
+      const lng = parseFloat(row[24]);
+      const lat = parseFloat(row[25]);
 
       if (isNaN(lat) || isNaN(lng)) return;
 
@@ -139,27 +159,51 @@ Papa.parse(CSV_URL, {
 
       const color = coloresTurno[(turnoNombre || "").toUpperCase()] || coloresTurno["OTRO"];
       const forma = formaPorNivel(nivel);
-      const icono = crearIcono(color, forma);
 
-      const popup = `
+      const marker = L.marker([latAdj, lngAdj], {
+        icon: crearIcono(color, forma)
+      });
+
+      marker.bindTooltip(nombreEscuela || "", { direction: "top", offset: [0, -8] });
+
+      marker.bindPopup(`
         <div class="popup">
           <h3>${nombreEscuela || ""}</h3>
-          <p><b>CCT:</b> ${cct || ""}</p>
           <p><b>Nivel:</b> ${nivel || ""}</p>
           <p><b>Turno:</b> ${turnoNombre || ""}</p>
           <p><b>Control:</b> ${control || ""}</p>
           <p><b>Domicilio:</b> ${domicilio || ""}, ${colonia || ""}, ${municipio || ""}, CP ${cp || ""}</p>
         </div>
-      `;
+      `);
 
-      L.marker([latAdj, lngAdj], { icon: icono })
-        .addTo(map)
-        .bindPopup(popup)
-        .bindTooltip(nombreEscuela || "", { direction: "top", offset: [0, -8] });
+      marker.addTo(capaEscuelas);
     });
   }
 });
-</script>
 
-</body>
-</html>
+/***********************************************************
+ LEYENDA
+***********************************************************/
+const legend = L.control({ position: "bottomright" });
+
+legend.onAdd = function () {
+  const div = L.DomUtil.create("div", "legend");
+  div.innerHTML = `
+    <b>Turno</b><br>
+    <div><span style="background:#1f77b4"></span>Matutino</div>
+    <div><span style="background:#ff7f0e"></span>Vespertino</div>
+    <div><span style="background:#2ca02c"></span>Nocturno</div>
+    <div><span style="background:#d62728"></span>Discontinuo</div>
+    <hr>
+    <b>Nivel</b><br>
+    ● Preescolar<br>
+    ■ Primaria<br>
+    ▲ Secundaria<br>
+    ◆ Media Superior
+  `;
+  return div;
+};
+
+legend.addTo(map);
+
+/********************************************

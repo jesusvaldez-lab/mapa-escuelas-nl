@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <!-- PapaParse para leer CSV -->
+  <!-- PapaParse -->
   <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
 
   <style>
@@ -25,14 +25,23 @@
 
 <script>
 /***********************************************************
- CONFIGURACIÓN GENERAL
+ CONFIGURACIÓN
 ***********************************************************/
+const CSV_URL =
+  "https://docs.google.com/spreadsheets/d/e/2PACX-1vT8WuSFX6UeAZioZlDRllmPe2FAfkIVHH-nUo1JbxTCMjbv_TfSJtP8R_LhGwiNCzrI0g1WJ0263NF_/pub?gid=1655227795&single=true&output=csv";
 
-// 1️⃣ URL del CSV publicado desde Google Drive
-// (Archivo → Compartir → Publicar en la web → CSV)
-const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT8WuSFX6UeAZioZlDRllmPe2FAfkIVHH-nUo1JbxTCMjbv_TfSJtP8R_LhGwiNCzrI0g1WJ0263NF_/pub?gid=1655227795&single=true&output=csv";
+/***********************************************************
+ MAPA BASE
+***********************************************************/
+const map = L.map("map").setView([25.67, -100.31], 8);
 
-// 2️⃣ Colores por TURNO (Clave del turno - columna B)
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  attribution: "© OpenStreetMap"
+}).addTo(map);
+
+/***********************************************************
+ COLORES POR TURNO
+***********************************************************/
 const coloresTurno = {
   "MATUTINO": "#1f77b4",
   "VESPERTINO": "#ff7f0e",
@@ -41,7 +50,9 @@ const coloresTurno = {
   "OTRO": "#9467bd"
 };
 
-// 3️⃣ Forma del marcador por NIVEL EDUCATIVO (columna F)
+/***********************************************************
+ FORMA POR NIVEL
+***********************************************************/
 function formaPorNivel(nivel) {
   switch ((nivel || "").toLowerCase()) {
     case "preescolar": return "circle";
@@ -53,37 +64,25 @@ function formaPorNivel(nivel) {
 }
 
 /***********************************************************
- MAPA BASE
+ EVITAR MARCADORES ENCIMADOS
 ***********************************************************/
-
-const map = L.map('map').setView([25.67, -100.31], 8); // Nuevo León por defecto
-
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  attribution: '© OpenStreetMap'
-}).addTo(map);
-
-/***********************************************************
- FUNCIÓN PARA EVITAR MARCADORES ENCIMADOS
-***********************************************************/
-
 const usados = {};
 function ajustarCoordenadas(lat, lng) {
-  const key = lat.toFixed(6) + ',' + lng.toFixed(6);
+  const key = lat.toFixed(6) + "," + lng.toFixed(6);
   if (!usados[key]) {
     usados[key] = 0;
     return [lat, lng];
   }
   usados[key]++;
-  const offset = usados[key] * 0.00015; // ~15 metros
+  const offset = usados[key] * 0.00015;
   return [lat + offset, lng + offset];
 }
 
 /***********************************************************
- CREAR ICONOS PERSONALIZADOS
+ ICONOS PERSONALIZADOS
 ***********************************************************/
-
 function crearIcono(color, forma) {
-  let size = 12;
+  const size = 12;
   let html = "";
 
   switch (forma) {
@@ -91,10 +90,10 @@ function crearIcono(color, forma) {
       html = `<div style="width:${size}px;height:${size}px;background:${color};"></div>`;
       break;
     case "triangle":
-      html = `<div style="width: 0;height: 0;border-left: ${size/2}px solid transparent;border-right: ${size/2}px solid transparent;border-bottom: ${size}px solid ${color};"></div>`;
+      html = `<div style="width:0;height:0;border-left:${size/2}px solid transparent;border-right:${size/2}px solid transparent;border-bottom:${size}px solid ${color};"></div>`;
       break;
     case "diamond":
-      html = `<div style="width:${size}px;height:${size}px;background:${color};transform: rotate(45deg);"></div>`;
+      html = `<div style="width:${size}px;height:${size}px;background:${color};transform:rotate(45deg);"></div>`;
       break;
     default:
       html = `<div style="width:${size}px;height:${size}px;background:${color};border-radius:50%;"></div>`;
@@ -102,80 +101,65 @@ function crearIcono(color, forma) {
 
   return L.divIcon({
     html: html,
-    className: '',
+    className: "",
     iconSize: [size, size]
   });
 }
 
 /***********************************************************
- CARGA DEL CSV Y CREACIÓN DE MARCADORES
+ CARGA DEL CSV (POR POSICIÓN DE COLUMNAS)
 ***********************************************************/
-
 Papa.parse(CSV_URL, {
   download: true,
-  header: true,
-  complete: function(results) {
-    results.data.forEach(row => {
+  header: false,
+  skipEmptyLines: true,
+  complete: function (results) {
 
-      // Columnas usadas según tu indicación
-      const cct = row['Clave del centro de trabajo'];          // A
-      const turnoClave = row['Clave del turno'];               // B
-      const turnoNombre = row['Nombre del turno'];             // C
-      const nombreEscuela = row['Nombre del centro de trabajo']; // D
-      const nivel = row['Nivel educativo'];                    // F
-      const control = row['Nombre del control (Público o Privado)']; // H
-      const municipio = row['Nombre del municipio o delegación']; // M
-      const colonia = row['Nombre de la colonia'];             // T
-      const domicilio = row['Domicilio'];                      // P
-      const cp = row['Código postal'];                          // V
+    // Omitir encabezado
+    results.data.slice(1).forEach(row => {
 
-      const lng = parseFloat(row['Ubicación de la escuela-localidad al Oeste del Meridiano de Greenwich, expresada en grados']); // Y
-      const lat = parseFloat(row['Ubicación de la escuela-localidad al norte del Ecuador, expresada en grados']); // Z
+      // Columnas (A = 0)
+      const cct           = row[0];   // A
+      const turnoClave    = row[1];   // B
+      const turnoNombre   = row[2];   // C
+      const nombreEscuela = row[3];   // D
+      const nivel         = row[5];   // F
+      const control       = row[7];   // H
+      const municipio     = row[12];  // M
+      const domicilio     = row[15];  // P
+      const colonia       = row[19];  // T
+      const cp            = row[21];  // V
+
+      const lng = parseFloat(row[24]); // Y
+      const lat = parseFloat(row[25]); // Z
 
       if (isNaN(lat) || isNaN(lng)) return;
 
       const [latAdj, lngAdj] = ajustarCoordenadas(lat, lng);
 
-      const color = coloresTurno[turnoNombre?.toUpperCase()] || coloresTurno['OTRO'];
+      const color = coloresTurno[(turnoNombre || "").toUpperCase()] || coloresTurno["OTRO"];
       const forma = formaPorNivel(nivel);
-
       const icono = crearIcono(color, forma);
 
       const popup = `
         <div class="popup">
-          <h3>${nombreEscuela}</h3>
-          <p><b>CCT:</b> ${cct}</p>
-          <p><b>Nivel:</b> ${nivel}</p>
-          <p><b>Turno:</b> ${turnoNombre}</p>
-          <p><b>Control:</b> ${control}</p>
-          <p><b>Domicilio:</b> ${domicilio}, Col. ${colonia}, ${municipio}, CP ${cp}</p>
+          <h3>${nombreEscuela || ""}</h3>
+          <p><b>CCT:</b> ${cct || ""}</p>
+          <p><b>Nivel:</b> ${nivel || ""}</p>
+          <p><b>Turno:</b> ${turnoNombre || ""}</p>
+          <p><b>Control:</b> ${control || ""}</p>
+          <p><b>Domicilio:</b> ${domicilio || ""}, ${colonia || ""}, ${municipio || ""}, CP ${cp || ""}</p>
         </div>
       `;
 
-      const marker = L.marker([latAdj, lngAdj], { icon: icono })
+      L.marker([latAdj, lngAdj], { icon: icono })
         .addTo(map)
         .bindPopup(popup)
-        .bindTooltip(nombreEscuela, { direction: 'top', offset: [0, -8] });
+        .bindTooltip(nombreEscuela || "", { direction: "top", offset: [0, -8] });
     });
   }
 });
-
-/***********************************************************
- MUNICIPIOS (DELIMITACIÓN)
-***********************************************************/
-
-// Cargar un GeoJSON de municipios (INEGI / NL)
-// Ejemplo:
-// fetch('municipios_nl.geojson').then(r => r.json()).then(geo => {
-//   L.geoJSON(geo, {
-//     style: {
-//       color: '#444',
-//       weight: 1,
-//       fillOpacity: 0.05
-//     }
-//   }).addTo(map);
-// });
-
 </script>
+
 </body>
 </html>

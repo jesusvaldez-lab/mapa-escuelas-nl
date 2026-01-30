@@ -1,108 +1,121 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="utf-8">
-<title>Mapa de Centros Educativos – Nuevo León</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8">
+  <title>Mapa de Escuelas NL</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<!-- Leaflet -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Leaflet CSS -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
 
-<!-- PapaParse -->
-<script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+    }
 
-<style>
-html, body {
-  margin: 0;
-  height: 100%;
-}
-#map {
-  width: 100%;
-  height: 100vh;
-}
-.popup h3 {
-  margin: 0 0 4px 0;
-  font-size: 14px;
-}
-.popup p {
-  margin: 2px 0;
-  font-size: 12px;
-}
-</style>
+    #map {
+      width: 100%;
+      height: 100%;
+    }
+  </style>
 </head>
 
 <body>
+
 <div id="map"></div>
 
+<!-- Leaflet JS -->
+<script
+  src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+  integrity="sha256-o9N1j7kGStpJr0v+U2Cq6iYG5PaY5E9O+V1x0zE2r3A="
+  crossorigin="">
+</script>
+
 <script>
-/* =========================
-   CONFIG
-   ========================= */
+/* =====================================================
+   1. URL DEL CSV (LA TUYA, YA CORRECTA)
+   ===================================================== */
+const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTc8SnyCU9h9CJNb0RMYIkT4EGuRCfIzKgg9AjsxAQ6udiPbws3fmLybJp1b_TREq29YrcJn3qmMyC-/pub?gid=0&single=true&output=csv";
 
-const CSV_URL =
-"https://docs.google.com/spreadsheets/d/e/2PACX-1vT8WuSFX6UeAZioZlDRllmPe2FAfkIVHH-nUo1JbxTCMjbv_TfSJtP8R_LhGwiNCzrI0g1WJ0263NF_/pub?gid=1655227795&single=true&output=csv";
-
-/* =========================
-   MAPA
-   ========================= */
-
-const map = L.map("map").setView([25.67, -100.31], 9);
+/* =====================================================
+   2. INICIALIZAR MAPA
+   ===================================================== */
+const map = L.map("map").setView([25.6866, -100.3161], 9);
 
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  maxZoom: 19,
   attribution: "© OpenStreetMap"
 }).addTo(map);
 
-/* =========================
-   CSV
-   ========================= */
+/* =====================================================
+   3. CARGAR CSV
+   ===================================================== */
+fetch(CSV_URL)
+  .then(res => res.text())
+  .then(csv => procesarCSV(csv))
+  .catch(err => console.error("Error cargando CSV:", err));
 
-Papa.parse(CSV_URL, {
-  download: true,
-  header: false,
-  skipEmptyLines: true,
+/* =====================================================
+   4. PROCESAR CSV
+   FORMATO ESPERADO:
+   CCT,NOMBRE,NIVEL,TURNO,CALLE,NUMERO,COLONIA,
+   MUNICIPIO,CODIGO POSTAL,ESTADO,LATITUD,LONGITUD
+   ===================================================== */
+function procesarCSV(texto) {
 
-  complete: function (res) {
+  const lineas = texto.trim().split("\n");
 
-    console.log("Filas totales:", res.data.length);
+  // quitar encabezado
+  lineas.shift();
 
-    res.data.slice(1).forEach(row => {
+  lineas.forEach(linea => {
 
-      const cct        = row[0];
-      const turno      = row[2];
-      const nombre     = row[3];
-      const nivel      = row[5];
-      const municipio  = row[12];
-      const domicilio  = row[15];
-      const colonia    = row[19];
-      const cp         = row[21];
+    if (!linea.trim()) return;
 
-      // 🔴 ÍNDICES CORRECTOS (CONFIRMADOS)
-      const lng = parseFloat(row[33]); // -100.17178
-      const lat = parseFloat(row[34]); // 25.68177
+    const columnas = linea.split(",");
 
-      if (Number.isNaN(lat) || Number.isNaN(lng)) return;
+    const cct        = columnas[0];
+    const nombre     = columnas[1];
+    const nivel      = columnas[2];
+    const turno      = columnas[3];
+    const calle      = columnas[4];
+    const numero     = columnas[5];
+    const colonia    = columnas[6];
+    const municipio  = columnas[7];
+    const cp         = columnas[8];
+    const estado     = columnas[9];
+    const latitud    = parseFloat(columnas[10]);
+    const longitud   = parseFloat(columnas[11]);
 
-      const popup = `
-        <div class="popup">
-          <h3>${nombre || ""}</h3>
-          <p><b>CCT:</b> ${cct || ""}</p>
-          <p><b>Nivel:</b> ${nivel || ""}</p>
-          <p><b>Turno:</b> ${turno || ""}</p>
-          <p><b>Dirección:</b> ${domicilio || ""}, ${colonia || ""}, ${municipio || ""}, CP ${cp || ""}</p>
-        </div>
-      `;
+    if (isNaN(latitud) || isNaN(longitud)) return;
 
-      L.circleMarker([lat, lng], {
-        radius: 3,
-        color: "#0066ff",
-        fillOpacity: 0.7
-      })
+    const direccion = `
+      ${calle} ${numero}<br>
+      Col. ${colonia}<br>
+      ${municipio}, ${estado}<br>
+      CP ${cp}
+    `;
+
+    L.marker([latitud, longitud])
       .addTo(map)
-      .bindPopup(popup);
-    });
-  }
-});
+      .bindPopup(`
+        <strong>${nombre}</strong><br><br>
+        <strong>CCT:</strong> ${cct}<br>
+        <strong>Nivel:</strong> ${nivel}<br>
+        <strong>Turno:</strong> ${turno}<br><br>
+        <strong>Dirección:</strong><br>
+        ${direccion}
+      `);
+  });
+}
 </script>
+
 </body>
 </html>

@@ -1,167 +1,56 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="utf-8" />
+  <meta charset="utf-8">
   <title>Mapa de Centros Educativos</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <!-- Leaflet -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <!-- PapaParse -->
   <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
 
   <style>
-    body { margin: 0; font-family: Arial, sans-serif; }
-    #map { height: 100vh; width: 100%; }
-    .popup h3 { margin: 0 0 6px 0; font-size: 14px; }
-    .popup p { margin: 2px 0; font-size: 12px; }
+    html, body {
+      height: 100%;
+      margin: 0;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+    }
+
+    #map {
+      height: 100%;
+      width: 100%;
+    }
+
+    .popup h3 {
+      margin: 0 0 6px 0;
+      font-size: 14px;
+    }
+
+    .popup p {
+      margin: 2px 0;
+      font-size: 12px;
+    }
   </style>
 </head>
+
 <body>
 
 <div id="map"></div>
 
 <script>
-/***********************************************************
- CONFIGURACIÓN
-***********************************************************/
-const CSV_URL =
-  "https://docs.google.com/spreadsheets/d/e/2PACX-1vT8WuSFX6UeAZioZlDRllmPe2FAfkIVHH-nUo1JbxTCMjbv_TfSJtP8R_LhGwiNCzrI0g1WJ0263NF_/pub?gid=1655227795&single=true&output=csv";
+  console.log("JS cargado correctamente");
 
-/***********************************************************
- MAPA BASE
-***********************************************************/
-const map = L.map("map").setView([25.67, -100.31], 8);
+  const map = L.map("map").setView([25.67, -100.31], 8);
 
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-  attribution: "© OpenStreetMap"
-}).addTo(map);
-
-/***********************************************************
- COLORES POR TURNO
-***********************************************************/
-const coloresTurno = {
-  "MATUTINO": "#1f77b4",
-  "VESPERTINO": "#ff7f0e",
-  "NOCTURNO": "#2ca02c",
-  "DISCONTINUO": "#d62728",
-  "OTRO": "#9467bd"
-};
-
-/***********************************************************
- FORMA POR NIVEL
-***********************************************************/
-function formaPorNivel(nivel) {
-  switch ((nivel || "").toLowerCase()) {
-    case "preescolar": return "circle";
-    case "primaria": return "square";
-    case "secundaria": return "triangle";
-    case "media superior": return "diamond";
-    default: return "circle";
-  }
-}
-
-/***********************************************************
- EVITAR MARCADORES ENCIMADOS
-***********************************************************/
-const usados = {};
-function ajustarCoordenadas(lat, lng) {
-  const key = lat.toFixed(6) + "," + lng.toFixed(6);
-  if (!usados[key]) {
-    usados[key] = 0;
-    return [lat, lng];
-  }
-  usados[key]++;
-  const offset = usados[key] * 0.00015;
-  return [lat + offset, lng + offset];
-}
-
-/***********************************************************
- ICONOS PERSONALIZADOS
-***********************************************************/
-function crearIcono(color, forma) {
-  const size = 12;
-  let html = "";
-
-  switch (forma) {
-    case "square":
-      html = `<div style="width:${size}px;height:${size}px;background:${color};"></div>`;
-      break;
-    case "triangle":
-      html = `<div style="width:0;height:0;border-left:${size/2}px solid transparent;border-right:${size/2}px solid transparent;border-bottom:${size}px solid ${color};"></div>`;
-      break;
-    case "diamond":
-      html = `<div style="width:${size}px;height:${size}px;background:${color};transform:rotate(45deg);"></div>`;
-      break;
-    default:
-      html = `<div style="width:${size}px;height:${size}px;background:${color};border-radius:50%;"></div>`;
-  }
-
-  return L.divIcon({
-    html: html,
-    className: "",
-    iconSize: [size, size]
-  });
-}
-
-/***********************************************************
- CARGA DEL CSV (SOLUCIÓN DEFINITIVA)
-***********************************************************/
-Papa.parse(CSV_URL, {
-  download: true,
-  header: false,
-  skipEmptyLines: true,
-  complete: function (results) {
-
-    // Saltar encabezado
-    results.data.slice(1).forEach(row => {
-
-      // Columnas por posición (A = 0)
-      const cct           = row[0];   // A
-      const turnoClave    = row[1];   // B
-      const turnoNombre   = row[2];   // C
-      const nombreEscuela = row[3];   // D
-      const nivel         = row[5];   // F
-      const control       = row[7];   // H
-      const municipio     = row[12];  // M
-      const domicilio     = row[15];  // P
-      const colonia       = row[19];  // T
-      const cp            = row[21];  // V
-
-      const lng = parseFloat(row[24]); // Y
-      const lat = parseFloat(row[25]); // Z
-
-      if (isNaN(lat) || isNaN(lng)) return;
-
-      const [latAdj, lngAdj] = ajustarCoordenadas(lat, lng);
-
-      const color = coloresTurno[(turnoNombre || "").toUpperCase()] || coloresTurno["OTRO"];
-      const forma = formaPorNivel(nivel);
-      const icono = crearIcono(color, forma);
-
-      const popup = `
-        <div class="popup">
-          <h3>${nombreEscuela || ""}</h3>
-          <p><b>CCT:</b> ${cct || ""}</p>
-          <p><b>Nivel:</b> ${nivel || ""}</p>
-          <p><b>Turno:</b> ${turnoNombre || ""}</p>
-          <p><b>Control:</b> ${control || ""}</p>
-          <p><b>Domicilio:</b> ${domicilio || ""}, ${colonia || ""}, ${municipio || ""}, CP ${cp || ""}</p>
-        </div>
-      `;
-
-      L.marker([latAdj, lngAdj], { icon: icono })
-        .addTo(map)
-        .bindPopup(popup)
-        .bindTooltip(nombreEscuela || "", {
-          direction: "top",
-          offset: [0, -8]
-        });
-    });
-  }
-});
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: "© OpenStreetMap"
+  }).addTo(map);
 </script>
 
 </body>

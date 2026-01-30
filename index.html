@@ -47,11 +47,29 @@
 <div id="map"></div>
 
 <script>
-/***********************************************************
- CONFIGURACIÓN
-***********************************************************/
-const CSV_URL =
-  "https://docs.google.com/spreadsheets/d/e/2PACX-1vT8WuSFX6UeAZioZlDRllmPe2FAfkIVHH-nUo1JbxTCMjbv_TfSJtP8R_LhGwiNCzrI0g1WJ0263NF_/pub?gid=1655227795&single=true&output=csv";
+const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT8WuSFX6UeAZioZlDRllmPe2FAfkIVHH-nUo1JbxTCMjbv_TfSJtP8R_LhGwiNCzrI0g1WJ0263NF_/pub?gid=1655227795&single=true&output=csv";
+
+Papa.parse(CSV_URL, {
+  download: true,
+  header: false,
+  skipEmptyLines: true,
+  complete: function (results) {
+
+    results.data.slice(1).forEach(row => {
+
+      const nombreEscuela = row[3];
+      const lng = parseFloat(row[24]); // Long_Dec
+      const lat = parseFloat(row[25]); // Lat_Dec
+
+      if (isNaN(lat) || isNaN(lng)) return;
+
+      L.marker([lat, lng])
+        .addTo(map)
+        .bindPopup(nombreEscuela || "Escuela");
+    });
+  }
+});
+</script>
 
 /***********************************************************
  MAPA BASE

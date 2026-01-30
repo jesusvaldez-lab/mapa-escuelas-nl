@@ -1,204 +1,108 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
-  <title>Mapa de Escuelas NL</title>
+<meta charset="utf-8">
+<title>Mapa de Centros Educativos – Nuevo León</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <!-- Leaflet -->
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-  />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- Leaflet -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <!-- PapaParse -->
-  <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
+<!-- PapaParse -->
+<script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
 
-  <style>
-    html, body {
-      margin: 0;
-      padding: 0;
-      height: 100%;
-      width: 100%;
-    }
-
-    #map {
-      width: 100%;
-      height: 100vh;
-    }
-
-    .popup h3 {
-      margin: 0 0 4px 0;
-      font-size: 14px;
-    }
-
-    .popup p {
-      margin: 2px 0;
-      font-size: 12px;
-    }
-  </style>
+<style>
+html, body {
+  margin: 0;
+  height: 100%;
+}
+#map {
+  width: 100%;
+  height: 100vh;
+}
+.popup h3 {
+  margin: 0 0 4px 0;
+  font-size: 14px;
+}
+.popup p {
+  margin: 2px 0;
+  font-size: 12px;
+}
+</style>
 </head>
 
 <body>
-
 <div id="map"></div>
 
 <script>
-/* ======================================================
-   1) CSV
-   ====================================================== */
+/* =========================
+   CONFIG
+   ========================= */
 
 const CSV_URL =
-  "https://docs.google.com/spreadsheets/d/e/2PACX-1vT8WuSFX6UeAZioZlDRllmPe2FAfkIVHH-nUo1JbxTCMjbv_TfSJtP8R_LhGwiNCzrI0g1WJ0263NF_/pub?gid=1655227795&single=true&output=csv";
+"https://docs.google.com/spreadsheets/d/e/2PACX-1vT8WuSFX6UeAZioZlDRllmPe2FAfkIVHH-nUo1JbxTCMjbv_TfSJtP8R_LhGwiNCzrI0g1WJ0263NF_/pub?gid=1655227795&single=true&output=csv";
 
-/* ======================================================
-   2) MAPA BASE
-   ====================================================== */
+/* =========================
+   MAPA
+   ========================= */
 
-const map = L.map("map").setView([25.67, -100.31], 8);
+const map = L.map("map").setView([25.67, -100.31], 9);
 
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
   attribution: "© OpenStreetMap"
 }).addTo(map);
 
-/* ======================================================
-   3) COLORES POR TURNO
-   ====================================================== */
-
-const coloresTurno = {
-  "MATUTINO": "#1f77b4",
-  "VESPERTINO": "#ff7f0e",
-  "NOCTURNO": "#2ca02c",
-  "DISCONTINUO": "#d62728",
-  "OTRO": "#9467bd"
-};
-
-/* ======================================================
-   4) FORMA POR NIVEL
-   ====================================================== */
-
-function formaPorNivel(nivel) {
-  switch ((nivel || "").toLowerCase()) {
-    case "preescolar": return "circle";
-    case "primaria": return "square";
-    case "secundaria": return "triangle";
-    case "media superior": return "diamond";
-    default: return "circle";
-  }
-}
-
-/* ======================================================
-   5) EVITAR SUPERPOSICIÓN
-   ====================================================== */
-
-const usados = {};
-
-function ajustarCoordenadas(lat, lng) {
-  const key = lat.toFixed(6) + "," + lng.toFixed(6);
-
-  if (!usados[key]) {
-    usados[key] = 0;
-    return [lat, lng];
-  }
-
-  usados[key]++;
-  const offset = usados[key] * 0.00012;
-  return [lat + offset, lng + offset];
-}
-
-/* ======================================================
-   6) ICONOS
-   ====================================================== */
-
-function crearIcono(color, forma) {
-  const size = 12;
-  let html = "";
-
-  switch (forma) {
-    case "square":
-      html = `<div style="width:${size}px;height:${size}px;background:${color};"></div>`;
-      break;
-
-    case "triangle":
-      html = `
-        <div style="
-          width:0;
-          height:0;
-          border-left:${size/2}px solid transparent;
-          border-right:${size/2}px solid transparent;
-          border-bottom:${size}px solid ${color};
-        "></div>`;
-      break;
-
-    case "diamond":
-      html = `<div style="width:${size}px;height:${size}px;background:${color};transform:rotate(45deg);"></div>`;
-      break;
-
-    default:
-      html = `<div style="width:${size}px;height:${size}px;background:${color};border-radius:50%;"></div>`;
-  }
-
-  return L.divIcon({
-    html,
-    className: "",
-    iconSize: [size, size]
-  });
-}
-
-/* ======================================================
-   7) CARGA CSV (ÍNDICES VERIFICADOS)
-   ====================================================== */
+/* =========================
+   CSV
+   ========================= */
 
 Papa.parse(CSV_URL, {
   download: true,
   header: false,
   skipEmptyLines: true,
 
-  complete: function (results) {
+  complete: function (res) {
 
-    results.data.slice(1).forEach(row => {
+    console.log("Filas totales:", res.data.length);
 
-      const cct         = row[0];
-      const turnoNombre = row[2];
-      const nombre      = row[3];
-      const nivel       = row[5];
-      const municipio   = row[12];
-      const domicilio   = row[15];
-      const colonia     = row[19];
-      const cp          = row[21];
+    res.data.slice(1).forEach(row => {
 
-      // ✅ ÍNDICES CORRECTOS (MUY IMPORTANTE)
-      const lng = parseFloat(row[33]); // Oeste de Greenwich (grados)
-      const lat = parseFloat(row[34]); // Norte del Ecuador (grados)
+      const cct        = row[0];
+      const turno      = row[2];
+      const nombre     = row[3];
+      const nivel      = row[5];
+      const municipio  = row[12];
+      const domicilio  = row[15];
+      const colonia    = row[19];
+      const cp         = row[21];
+
+      // 🔴 ÍNDICES CORRECTOS (CONFIRMADOS)
+      const lng = parseFloat(row[33]); // -100.17178
+      const lat = parseFloat(row[34]); // 25.68177
 
       if (Number.isNaN(lat) || Number.isNaN(lng)) return;
-
-      const [latA, lngA] = ajustarCoordenadas(lat, lng);
-
-      const color =
-        coloresTurno[(turnoNombre || "").toUpperCase()] || coloresTurno.OTRO;
-
-      const forma = formaPorNivel(nivel);
-      const icono = crearIcono(color, forma);
 
       const popup = `
         <div class="popup">
           <h3>${nombre || ""}</h3>
           <p><b>CCT:</b> ${cct || ""}</p>
           <p><b>Nivel:</b> ${nivel || ""}</p>
-          <p><b>Turno:</b> ${turnoNombre || ""}</p>
-          <p><b>Domicilio:</b> ${domicilio || ""}, ${colonia || ""}, ${municipio || ""}, CP ${cp || ""}</p>
+          <p><b>Turno:</b> ${turno || ""}</p>
+          <p><b>Dirección:</b> ${domicilio || ""}, ${colonia || ""}, ${municipio || ""}, CP ${cp || ""}</p>
         </div>
       `;
 
-      L.marker([latA, lngA], { icon: icono })
-        .addTo(map)
-        .bindPopup(popup)
-        .bindTooltip(nombre || "", { direction: "top", offset: [0, -8] });
+      L.circleMarker([lat, lng], {
+        radius: 3,
+        color: "#0066ff",
+        fillOpacity: 0.7
+      })
+      .addTo(map)
+      .bindPopup(popup);
     });
   }
 });
 </script>
-
 </body>
 </html>

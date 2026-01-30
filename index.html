@@ -53,7 +53,6 @@ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
   attribution: "© OpenStreetMap"
 }).addTo(map);
 
-/* CSV */
 Papa.parse(CSV_URL, {
   download: true,
   header: true,
@@ -77,7 +76,7 @@ Papa.parse(CSV_URL, {
             <b>Dirección:</b><br>
             ${row.CALLE} ${row.NUMERO}, ${row.COLONIA}<br>
             ${row.MUNICIPIO}, ${row.ESTADO}<br>
-            CP ${row["CODIGO POSTAL"]}
+            CP ${row.CODIGO_POSTAL}
           </p>
         </div>
       `;
